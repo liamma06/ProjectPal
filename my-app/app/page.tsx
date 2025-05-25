@@ -4,6 +4,7 @@ import {useState, useRef, useEffect} from "react";
 
 export default function Home() {
   const [idea, setIdea] = useState("");
+  const [apiStatus, setApiStatus] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto resize the textarea as content grows
@@ -15,6 +16,23 @@ export default function Home() {
     }
   }, [idea]);
 
+  // Test API connection when component mounts
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        setApiStatus("Testing connection...");
+        const response = await fetch("http://localhost:8000/ping");
+        const data = await response.json();
+        setApiStatus(`Connected! ${data.message}`);
+      } catch (error) {
+        setApiStatus("Connection failed. Is the API running?");
+        console.error("API connection error:", error);
+      }
+    };
+
+    testConnection();
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log(idea);
@@ -24,6 +42,17 @@ export default function Home() {
     <main className="flex min-h-[calc(100vh-76px)] flex-col items-center justify-center p-6">
       <div className="w-full max-w-lg text-center space-y-8">
         <h1 className="text-4xl font-bold text-gray-800">What Idea is On Your Mind?</h1>
+        
+        {/* API Status Indicator */}
+        <div className={`text-sm px-4 py-2 rounded-md ${
+          apiStatus.includes("Connected") 
+            ? "bg-green-50 text-green-700" 
+            : apiStatus.includes("failed") 
+              ? "bg-red-50 text-red-700"
+              : "bg-blue-50 text-blue-700"
+        }`}>
+          API Status: {apiStatus || "Checking..."}
+        </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
