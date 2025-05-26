@@ -1,6 +1,10 @@
 from typing import Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+class Project_Idea(BaseModel):
+    idea:str
 
 app = FastAPI()
 
@@ -18,6 +22,7 @@ def read_root():
     return {"Hello": "World"}
 
 
-@app.get("/ping")
-def ping():
-    return {"status": "success", "message": "pong"}
+@app.post("/idea")
+async def process_idea(data:Project_Idea):
+    print(f"Received idea: {data.idea}")
+    return {"message": f"Idea '{data.idea}' received successfully!"}
