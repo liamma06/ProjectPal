@@ -5,7 +5,7 @@ export default function Header() {
     return (
         <header className="p-4 bg-white border-b border-gray-200 shadow-sm">
         <div className ="mx-auto px-4 flex justify-between items-center"> 
-                <Link className="flex items-center gap-2 text-2xl font-bold text-gray-700 hover:text-gray-900" href="/">
+                <a className="flex items-center gap-2 text-2xl font-bold text-gray-700 hover:text-gray-900" href="/">
                     <Image
                     src="/Project Pal.svg"
                     alt="Project Pal Logo"
@@ -14,8 +14,8 @@ export default function Header() {
                     className="rounded"
                     />
                     Project Pal
-                </Link>
-                
+                </a>
+
                 <Link 
                     href="/contact" 
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors font-bold"

@@ -1,11 +1,13 @@
 "use client";
 
 import {useState, useRef, useEffect} from "react";
+import ResponseComponent from "@/components/ResponseComp";
 
 export default function Home() {
   const [idea, setIdea] = useState("");
-  const [response,setResponse] = useState("");
+  const [response, setResponse] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResponse, setShowResponse] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto resize the textarea 
@@ -34,51 +36,58 @@ export default function Home() {
       const data = await response.json();
       setResponse(data.message);
       setIdea("");
+      setShowResponse(true); // Show response component instead of redirecting
     }catch (error){
       setResponse("An error occurred while submitting your idea. Please try again.");
+      setShowResponse(true);
     }finally {
       setIsSubmitting(false);
     }
   };
 
+  const resetForm = () => {
+    setShowResponse(false);
+    setResponse("");
+  };
+
   return (
     <main className="flex min-h-[calc(100vh-76px)] flex-col items-center justify-center p-6">
-      <div className="w-full max-w-lg text-center space-y-8">
-        <h1 className="text-4xl font-bold text-gray-800">What Idea is On Your Mind?</h1>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={idea}
-              onChange={(e) => setIdea(e.target.value)}
-              placeholder="Type your project idea here..."
-              rows={1}
-              className="w-full px-6 py-4 text-lg bg-white border border-gray-300 rounded-3xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden"
-            />
-             <button
-              type="submit"
-              className={`absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-full transition-colors ${
-                isSubmitting ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"
-              }`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Sending..." : "Submit"}
-            </button>
-          </div>
-        </form>
-
-        {response && (
-          <div className="mt-4 p-4 bg-blue-50 text-blue-700 rounded-lg">
-            {response}
-          </div>
-        )}
-
-        
-        <p className="text-gray-600 mt-4">
-          Share your project ideas and we'll help you bring them to life
-        </p>
-      </div>
+      {!showResponse ? (
+        <div className="w-full max-w-lg text-center space-y-8">
+          <h1 className="text-4xl font-bold text-gray-800">What Idea is On Your Mind?</h1>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                placeholder="Type your project idea here..."
+                rows={1}
+                className="w-full px-6 py-4 text-lg bg-white border border-gray-300 rounded-3xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden"
+              />
+              <button
+                type="submit"
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-full transition-colors ${
+                  isSubmitting ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"
+                }`}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Sending..." : "Submit"}
+              </button>
+            </div>
+          </form>
+          
+          <p className="text-gray-600 mt-4">
+            Share your project ideas and we'll help you bring them to life
+          </p>
+        </div>
+      ) : (
+        <ResponseComponent 
+          responseMessage={response}
+          onBack={resetForm}
+        />
+      )}
     </main>
   );
 }
