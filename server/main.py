@@ -10,7 +10,7 @@ import uuid
 import json
 import re
 
-from langgraph.graph import StateGraph, START
+from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -50,7 +50,6 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-conversation_store = MemorySaver()
 
 conversation_graphs = {}
 
@@ -148,7 +147,7 @@ def regenerate_concept(state:ConversationState):
     return{
         "messages": messages + [AIMessage(content=response.content)],
         "generated_concept": response.content.strip(),
-        "regeneration_attemps": state.get("regeneration_attemps", 0) + 1
+        "regeneration_attempts": state.get("regeneration_attempts", 0) + 1
     }
 
 #generate full project plan 
@@ -171,9 +170,17 @@ def generate_plan(state:ConversationState):
     6. Technology stack (recommend specific technologies and why they're suitable)
     7. Competitive analysis (2-3 similar products and how this project differentiates)
     8. Unique selling points (what makes this special?)
-    9. Development roadmap (suggested phases for implementation)
     
-    Format your response in clean markdown with clear headings.
+    Format your response in clean markdown with:
+    - Use H1 (# Title) for the project title
+    - Use H2 (## Section) for major sections
+    - Use H3 (### Subsection) for subsections when needed
+    - Include a blank line between sections
+    - Use bullet points (- item) for lists
+    - Bold important concepts with **bold text**
+    - Use horizontal rules (---) to separate major sections
+    
+    Make your markdown visually clean and well-spaced.
     """
 
     #send and store messages
@@ -209,9 +216,17 @@ def revise_plan(state:ConversationState):
     6. Technology stack (recommend specific technologies and why they're suitable)
     7. Competitive analysis (2-3 similar products and how this project differentiates)
     8. Unique selling points (what makes this special?)
-    9. Development roadmap (suggested phases for implementation)
     
-    Format your response in clean markdown with clear headings.
+    Format your response in clean markdown with:
+    - Use H1 (# Title) for the project title
+    - Use H2 (## Section) for major sections
+    - Use H3 (### Subsection) for subsections when needed
+    - Include a blank line between sections
+    - Use bullet points (- item) for lists
+    - Bold important concepts with **bold text**
+    - Use horizontal rules (---) to separate major sections
+    
+    Make your markdown visually clean and well-spaced.
     """
 
     #send and store messages
@@ -227,13 +242,16 @@ def revise_plan(state:ConversationState):
 #conditional logic if not UNIQUE enough, regenerate concept again
 def should_regenerate(state:ConversationState):
     verdict = state.get("verdict", "UNIQUE")
-    regeneration_attemps = state.get("regeneration_attempts", 0)
-    if verdict == "UNIQUE" or regeneration_attemps >= 2:
+    regeneration_attempts = state.get("regeneration_attempts", 0)
+    if verdict == "UNIQUE" or  regeneration_attempts >= 2:
         return "generate_plan"
     else:
         return "regenerate_concept"
     
 #convo graphs 
+# Create a shared memory saver l
+shared_memory = MemorySaver()
+
 def create_conversation_graph(idea:str,conversation_id:str):
     workflow = StateGraph(ConversationState)
 
@@ -256,11 +274,18 @@ def create_conversation_graph(idea:str,conversation_id:str):
     #edges 
     workflow.add_edge(START, "generate_concept")
     workflow.add_edge("generate_concept", "validate_concept")
-    workflow.add_edge("validate_concept",should_regenerate)
+    workflow.add_conditional_edges(
+        "validate_concept",
+        should_regenerate,
+        {
+            "generate_plan": "generate_plan",
+            "regenerate_concept": "regenerate_concept"
+        }
+    )
     workflow.add_edge("regenerate_concept", "validate_concept")
     workflow.add_edge("generate_plan", END)
 
-    return workflow.compile(checkpointer = conversation_store)
+    return workflow.compile(checkpointer=shared_memory)
 
 
 @app.get("/")
@@ -274,11 +299,11 @@ async def process_idea(data:Project_Idea):
     try:
         conversation_id = str(uuid.uuid4())
 
-        #new graph 
+        # New graph 
         graph = create_conversation_graph(data.idea, conversation_id)
         conversation_graphs[conversation_id] = graph
 
-        #initial state
+        # Initial state
         initial_state = {
             "messages": [SystemMessage(content="You are a helpful project ideation assistant.")],
             "original_idea": data.idea,
@@ -287,11 +312,15 @@ async def process_idea(data:Project_Idea):
             "conversation_id": conversation_id,
             "regeneration_attempts": 0
         }
-        #run
-        result = await graph.run(initial_state)
+        
+        # Run with the checkpoint_id to identify this conversation
+        result = await graph.ainvoke(
+            initial_state, 
+            config={"thread_id": conversation_id}
+        )
 
         return {
-            "message": result.get("project_plane", "No project plan generated."),
+            "message": result.get("project_plan", "No project plan generated."),
             "conversation_id": conversation_id,
             "generated_concept": result.get("generated_concept", ""),
             "iteration": 1,
@@ -311,15 +340,18 @@ async def process_feedback(data: Feedback):
             return {"message": "Conversation not found.", "status": "error"}
         
         graph = conversation_graphs[conversation_id]
-
-        #cur state
-        current_state= await conversation_store.get(conversation_id)
+        
+        # Use the shared memory saver
+        current_state = await shared_memory.get(conversation_id)
         if not current_state:
             return {"message": "Conversation state not found.", "status": "error"}
         
-        #run revision
+        # Run revision with the same checkpoint_id configuration
         current_state["feedback"] = data.feedback
-        result = await graph.ainvoke(current_state, {"node": "revise_plan"})
+        result = await graph.ainvoke(
+            current_state, 
+            config={"thread_id": conversation_id}
+        )
 
         return {
             "message": result.get("project_plan", "Plan revision failed."),
