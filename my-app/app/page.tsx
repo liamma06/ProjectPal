@@ -9,7 +9,6 @@ export default function Home() {
   const [response, setResponse] = useState("");
   const [conversationId, setConversationId] = useState("");
   const [generatedConcept, setGeneratedConcept] = useState("");
-  const [iteration, setIteration] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -44,7 +43,6 @@ export default function Home() {
         setResponse(data.message);
         setConversationId(data.conversation_id);
         setGeneratedConcept(data.generated_concept);
-        setIteration(data.iteration || 1);
         setShowResponse(true);
       }else{
         setResponse("Error: " + data.message);
@@ -65,7 +63,6 @@ export default function Home() {
     setConversationId("");
     setGeneratedConcept("");
     setIdea("");
-    setIteration(1);
   };
 
   return (
@@ -112,7 +109,6 @@ export default function Home() {
           responseMessage={response}
           conversationId={conversationId}
           generatedConcept={generatedConcept}
-          iteration={iteration}
           onBack={resetForm}
         />
       )}

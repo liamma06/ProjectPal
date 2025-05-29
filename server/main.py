@@ -24,10 +24,6 @@ model = ChatAnthropic(
 class Project_Idea(BaseModel):
     idea:str
 
-class Feedback(BaseModel):
-    feedback:str
-    conversation_id:str
-
 #conversation model
 class ConversationState(TypedDict):
     messages: List[Union[HumanMessage, AIMessage, SystemMessage]]
@@ -38,7 +34,6 @@ class ConversationState(TypedDict):
     regeneration_attempts: int
     project_plan: Optional[str]
     verdict: Optional[str]
-    feedback: Optional[str]
 
 
 app = FastAPI()
@@ -191,54 +186,6 @@ def generate_plan(state:ConversationState):
         "project_plan": response.content.strip(),
     }
 
-#feedback processing
-def revise_plan(state:ConversationState):
-    #feedback retrieval in case not provided 
-    feedback = state.get("feedback", "")
-    concept = state["generated_concept"]
-    original_idea = state["original_idea"]
-
-    feedback_prompt = f"""A user provided the following feedback on the project plan:
-    
-    "{feedback}"
-    
-    Based on this feedback, generate an improved version of the project plan.
-    
-    Original concept: {concept}
-    Original user idea: {original_idea}
-    
-    Incorporate the user's feedback while still maintaining:
-    1. Project title (make it catchy and memorable)
-    2. Executive summary (1 paragraph overview)
-    3. Problem statement (what issue does this solve?)
-    4. Target audience (who will use this?)
-    5. Key Features (at least 3 main features with brief descriptions)
-    6. Technology stack (recommend specific technologies and why they're suitable)
-    7. Competitive analysis (2-3 similar products and how this project differentiates)
-    8. Unique selling points (what makes this special?)
-    
-    Format your response in clean markdown with:
-    - Use H1 (# Title) for the project title
-    - Use H2 (## Section) for major sections
-    - Use H3 (### Subsection) for subsections when needed
-    - Include a blank line between sections
-    - Use bullet points (- item) for lists
-    - Bold important concepts with **bold text**
-    - Use horizontal rules (---) to separate major sections
-    
-    Make your markdown visually clean and well-spaced.
-    """
-
-    #send and store messages
-    messages = state["messages"] + [HumanMessage(content=feedback_prompt)]
-    response = model.invoke(messages)
-
-    return{
-        "messages": messages + [AIMessage(content=response.content)],
-        "project_plan": response.content.strip(),
-        "iteration":state.get("iteration", 0) + 1,
-    }
-
 #conditional logic if not UNIQUE enough, regenerate concept again
 def should_regenerate(state:ConversationState):
     verdict = state.get("verdict", "UNIQUE")
@@ -248,10 +195,11 @@ def should_regenerate(state:ConversationState):
     else:
         return "regenerate_concept"
     
-#convo graphs 
-# Create a shared memory saver l
+
+# Create memory saver instead
 shared_memory = MemorySaver()
 
+#create graph 
 def create_conversation_graph(idea:str,conversation_id:str):
     workflow = StateGraph(ConversationState)
 
@@ -269,7 +217,6 @@ def create_conversation_graph(idea:str,conversation_id:str):
     workflow.add_node("validate_concept", validate_concept)
     workflow.add_node("regenerate_concept", regenerate_concept)
     workflow.add_node("generate_plan", generate_plan)
-    workflow.add_node("revise_plan", revise_plan)
 
     #edges 
     workflow.add_edge(START, "generate_concept")
@@ -327,40 +274,11 @@ async def process_idea(data:Project_Idea):
             "status": "success",
         }
     
+    except Exception as redis_error:
+            print(f"Redis error: {str(redis_error)}")
+            return {"message": "Error connecting to state storage. Please try again.", "status": "error"}   
+    
     except Exception as e:
         print(f"Error processing idea: {str(e)}")
         return {"message": f"Error processing your idea: {str(e)}", "status": "error"}
-
-@app.post("/feedback")
-async def process_feedback(data: Feedback):
-    try:
-        conversation_id = data.conversation_id
-
-        if conversation_id not in conversation_graphs:
-            return {"message": "Conversation not found.", "status": "error"}
-        
-        graph = conversation_graphs[conversation_id]
-        
-        # Use the shared memory saver
-        current_state = await shared_memory.get(conversation_id)
-        if not current_state:
-            return {"message": "Conversation state not found.", "status": "error"}
-        
-        # Run revision with the same checkpoint_id configuration
-        current_state["feedback"] = data.feedback
-        result = await graph.ainvoke(
-            current_state, 
-            config={"thread_id": conversation_id}
-        )
-
-        return {
-            "message": result.get("project_plan", "Plan revision failed."),
-            "conversation_id": conversation_id,
-            "iteration": result.get("iteration", 1),
-            "status": "success"
-        }
-        
-    except Exception as e:
-        print(f"Error processing feedback: {str(e)}")
-        return {"message": f"Error processing your feedback: {str(e)}", "status": "error"}
-
+    
