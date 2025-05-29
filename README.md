@@ -19,19 +19,7 @@
 | AI & LLMs    | OpenAI API                                                  |
 | Hosting      | Frontend: Vercel · Backend: Render                          |
 
-## 🚧 How It Works
 
-1. **User inputs a vague or raw idea** (e.g., "an AI tool for students").
-2. **LangChain + LangGraph pipeline** breaks down the input, enriches it with context, filters for originality, and expands it into:
-   - Features
-   - Tech suggestions
-   - Target users
-   - JSON schema of idea
-3. The result is returned to the frontend and rendered as a clean, interactive card.
-
-## 📦 Running Locally
-
-1. **Clone the repo:**
 
    ```bash
    git clone https://github.com/your-username/project-pal.git
